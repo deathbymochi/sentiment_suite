@@ -22,22 +22,25 @@ class SentimentFactory(object):
 	def run_suite(self):
 		"""Starts library runs for each essay"""
 		library = get_library_from_file(self.library_filepath)
-
-		texts = get_next_text_from_file(self.text_filepath)
-		for text in texts:
-			append_to_output_file(LibraryRun(essay, library))
+		with open(self.output_directory+self.output_filename, "w") as out:
+			texts = get_next_text_from_file(self.text_filepath)
+			for text in texts:
+				append_to_output_file(LibraryRun(essay, library))
 
 	def get_library_from_file(self, library_filepath):
 		"""Load library from filepath"""
-		pass
+		with open(library_filepath, "r") as lib_file:
+			library = {}
+			for index, line in enumerate(lib_file.readlines()):
+				phrase, score = line.split('\t')
+				library[phrase] = (int(score), index)
+		return library
 
 	def get_next_text_from_file(self, text_filepath):
 		"""Stream next line from text file"""
 		with open(text_filepath, "r") as full_text:
 			next_clean_line = clean_row(full_text.readline())
 			pass
-
-
 
 
 	def append_to_output_file(self, output_line, output_filepath):
