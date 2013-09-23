@@ -22,31 +22,31 @@ class SentimentFactory(object):
 	def run_suite(self):
 		"""Starts library runs for each essay"""
 		library = get_library_from_file(self.library_filepath)
-		with open(self.output_directory+self.output_filename, "w") as out:
-			texts = get_next_text_from_file(self.text_filepath)
-			for text in texts:
-				append_to_output_file(LibraryRun(essay, library))
+		with open(self.output_directory+self.output_filename, "a") as out:
+			with open(text_filepath, "r") as full_text:
+				texts = stream_lines(full_text)
+				for text in texts:
+					run_instance = LibraryRun(text, library)
+					append_to_output_file(run_instance, out)
+					#verbose_output(run_instance)
 
 	def get_library_from_file(self, library_filepath):
 		"""Load library from filepath"""
 		with open(library_filepath, "r") as lib_file:
 			library = {}
-			for index, line in enumerate(lib_file.readlines()):
+			for index, line in enumerate(lib_file):
 				phrase, score = line.split('\t')
 				library[phrase] = (int(score), index)
 		return library
 
-	def get_next_text_from_file(self, text_filepath):
-		"""Stream next line from text file"""
-		with open(text_filepath, "r") as full_text:
-			next_clean_line = clean_row(full_text.readline())
-			pass
+	def stream_lines(self, full_text):
+		"""Stream lines from text file. This is a generator."""
+		for line in full_text:
+			yield clean_row(line)
 
-
-	def append_to_output_file(self, output_line, output_filepath):
+	def append_to_output_file(self, run_instance, output_file):
 		"""Appends single line to an output file"""
-		pass
-
+		output_file.write(run_instance.results)
 
 
 class LibraryRun(object):
