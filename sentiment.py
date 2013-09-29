@@ -42,12 +42,11 @@ def tokenize(text, min_words=1, max_words=None):
 
 	tokens_list = []
 	for j in range(max_words - min_words + 1):
-		tokens_list.append([])	
 		for i in range(len(text)):
 			if i > len(text) - min_words - j:
 				break
 			else:
-				tokens_list[j].append(' '.join(text[i:(i + j + min_words)]))
+				tokens_list.append((' '.join(text[i:(i + j + min_words)]), i))
 	return tokens_list
 
 
@@ -118,10 +117,12 @@ class LibraryRun(object):
 
 		_, word_freq, tokens_list = self.do_preprocessing()
 		
+
 		matches_list = []
 		for phrase in library:
-			for i in range(len())		
-			re.search('^(' + phrase + ')$', )
+			for li in tokens_list:
+				for i in range(len(li)):	
+					re.search('^(' + phrase + ')$', )
 
 
 
