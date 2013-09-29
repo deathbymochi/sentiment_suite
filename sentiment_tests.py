@@ -31,6 +31,56 @@ class TestCleanRowFunction(unittest.TestCase):
 			'100\tan "apple...:" is it yellow-green, or red/orange?')
 		self.assertEqual(obj_ut[1], "an apple is it yellowgreen or redorange")
 
+	def test_clean_row_control_chars(self):
+		pass
+
+	# def test_clean_row_digits(self):
+	# 	"""Tests clean_row removes digits"""
+	# 	obj_ut = sentiment.clean_row(
+	# 		'100\t1 apple three apple 123 apples')
+	# 	self.assertEqual(obj_ut[1], ' apple three apple  apples')
+
+
+class TestGetWordFreqFunction(unittest.TestCase):
+	"""Tests get_word_freq function returns word frequency properly"""
+	def test_get_word_freq(self):
+		obj_ut = sentiment.get_word_freq(
+			'apple orange orange orange mangosteen')
+		self.assertDictEqual(obj_ut, {'apple': 1, 'orange': 3, 'mangosteen': 1})
+
+
+class TestTokenizeFunction(unittest.TestCase):
+	"""Tests tokenize function returns list of tokens properly"""
+	def test_tokenize_min_words(self):
+		"""Tests tokenize function creates tokens 
+		no shorter than min_words long"""
+		obj_ut = sentiment.tokenize(
+			['a', 'brown', 'cat', 'chases', 'mice'], min_words=2)
+		self.assertEqual(obj_ut, [
+			['a brown', 'brown cat', 'cat chases', 'chases mice']])
+	def test_tokenize_no_min_no_max(self):
+		"""Tests tokenize function creates 1-word tokens when
+		no min_words or max_words args are provided"""
+		obj_ut = sentiment.tokenize(
+			['a', 'brown', 'cat', 'chases', 'mice'])
+		self.assertEqual(obj_ut, [['a', 'brown', 'cat', 'chases', 'mice']])
+	def test_tokenize_max_words(self):
+		"""Tests tokenize function creates tokens up to max_words long"""
+		obj_ut = sentiment.tokenize(
+			['a', 'brown', 'cat', 'chases', 'mice'], max_words=4)
+		self.assertEqual(obj_ut, [['a', 'brown', 'cat', 'chases', 'mice'],
+			['a brown', 'brown cat', 'cat chases', 'chases mice'],
+			['a brown cat', 'brown cat chases', 'cat chases mice'],
+			['a brown cat chases', 'brown cat chases mice']])
+	def test_tokenize_zero_value(self):
+		"""Tests tokenize function correctly defaults to 1-word tokens if
+		zero values given for min_words or max_words"""
+		text = ['a', 'brown', 'cat', 'chases', 'mice']
+		min_words = max_words = 0
+		self.assertRaises(sentiment.SentimentException,
+			sentiment.tokenize, text, min_words, max_words)
+
+
 class TestSentimentFactory(unittest.TestCase):
 	"""Tests for the SentimentFactory class"""
 	def test_instantiate_sentiment_factory(self):
@@ -70,7 +120,7 @@ class TestSentimentFactory(unittest.TestCase):
 class TestLibraryRun(unittest.TestCase):
 	"""Tests for the LibraryRun class"""
 	def test_instantiate_library_run(self):
-		obj_ut = sentiment.LibraryRun()
+		obj_ut = sentiment.LibraryRun("", "")
 		self.assertIsInstance(obj_ut, sentiment.LibraryRun)
 
 
