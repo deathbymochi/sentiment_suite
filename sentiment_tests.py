@@ -54,8 +54,8 @@ class TestTokenizeFunction(unittest.TestCase):
 	def test_tokenize_min_words(self):
 		"""Tests tokenize function creates tokens 
 		no shorter than min_words long"""
-		obj_ut = sentiment.tokenize(
-			['a', 'brown', 'cat', 'chases', 'mice'], min_words=2)
+		obj_ut = list(sentiment.tokenize(
+			['a', 'brown', 'cat', 'chases', 'mice'], min_words=2))
 		self.assertEqual(obj_ut, 
 			[('a brown', 0), 
 			('brown cat', 1), 
@@ -64,14 +64,14 @@ class TestTokenizeFunction(unittest.TestCase):
 	def test_tokenize_no_min_no_max(self):
 		"""Tests tokenize function creates 1-word tokens when
 		no min_words or max_words args are provided"""
-		obj_ut = sentiment.tokenize(
-			['a', 'brown', 'cat', 'chases', 'mice'])
+		obj_ut = list(sentiment.tokenize(
+			['a', 'brown', 'cat', 'chases', 'mice']))
 		self.assertEqual(obj_ut, 
 			[('a', 0), ('brown', 1), ('cat', 2), ('chases', 3), ('mice', 4)])
 	def test_tokenize_max_words(self):
 		"""Tests tokenize function creates tokens up to max_words long"""
-		obj_ut = sentiment.tokenize(
-			['a', 'brown', 'cat', 'chases', 'mice'], max_words=4)
+		obj_ut = list(sentiment.tokenize(
+			['a', 'brown', 'cat', 'chases', 'mice'], max_words=4))
 		self.assertEqual(obj_ut, 
 			[('a', 0), ('brown', 1), ('cat', 2), ('chases', 3), ('mice', 4),
 			('a brown', 0), ('brown cat', 1), ('cat chases', 2), ('chases mice', 3),
@@ -82,8 +82,10 @@ class TestTokenizeFunction(unittest.TestCase):
 		zero values given for min_words or max_words"""
 		text = ['a', 'brown', 'cat', 'chases', 'mice']
 		min_words = max_words = 0
+		args = [text, min_words, max_words]
+		func = sentiment.tokenize
 		self.assertRaises(sentiment.SentimentException,
-			sentiment.tokenize, text, min_words, max_words)
+			lambda y: list(func(*y)), args)
 
 
 class TestSentimentFactory(unittest.TestCase):

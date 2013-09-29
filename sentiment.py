@@ -40,14 +40,12 @@ def tokenize(text, min_words=1, max_words=None):
 	if min_words == 0 or max_words == 0:
 		raise SentimentException("learn how to count!")
 
-	tokens_list = []
 	for j in range(max_words - min_words + 1):
 		for i in range(len(text)):
 			if i > len(text) - min_words - j:
 				break
 			else:
-				tokens_list.append((' '.join(text[i:(i + j + min_words)]), i))
-	return tokens_list
+				yield (' '.join(text[i:(i + j + min_words)]), i)
 
 
 class SentimentFactory(object):
@@ -120,9 +118,8 @@ class LibraryRun(object):
 
 		matches_list = []
 		for phrase in library:
-			for li in tokens_list:
-				for i in range(len(li)):	
-					re.search('^(' + phrase + ')$', )
+			for (token, token_pos) in tokens_list:	
+				matches_list.append((re.search('^(' + phrase + ')$', token).string, token_pos))
 
 
 
