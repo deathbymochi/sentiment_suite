@@ -47,6 +47,34 @@ def tokenize(text, min_words=1, max_words=None):
 			else:
 				yield (' '.join(text[i:(i + j + min_words)]), i)
 
+def get_library_from_file(library_filepath):
+	"""Load library from filepath
+	output = dictionary of library phrases to tuple of 
+	(phrase score, rule index)"""
+	with open(library_filepath, "r") as lib_file:
+		library = {}
+		for index, line in enumerate(lib_file):
+			phrase, score = line.split('\t')
+			library[phrase] = (int(score), index)
+	return library
+
+def get_opposite_meaning(phrase):
+	"""Adds/removes negation words to/from phrase to get opposite meaning"""
+	negation_words = '(not|dont|cant|wont|couldnt|shouldnt|never) \w{0,2} ?'
+	if negation_words in phrase:
+		phrase = phrase.replace(negation_words, "")
+	else:
+		phrase = negation_words + phrase
+	return phrase
+
+def create_negation_lib(library):
+	"""Creates negation library from given library by adding 
+	negation words to each phrase and reversing the score"""
+	negation_lib = {}
+	for phrase, (score, rule_num) in library.iteritems():
+		negation_lib[get_opposite_meaning(phrase)] = (-score, rule_num)
+	return negation_lib
+
 
 class SentimentFactory(object):
 	"""Factory class for creating instances of library runs"""
@@ -59,26 +87,15 @@ class SentimentFactory(object):
 
 	def run_suite(self):
 		"""Starts library runs for each essay"""
-		library = self.get_library_from_file(self.library_filepath)
+		library = get_library_from_file(self.library_filepath)
+		negation_library = create_negation_lib(library)
 		with open(self.output_directory+self.output_filename, "a") as out:
 			with open(text_filepath, "r") as full_text:
 				texts = self.stream_lines(full_text)
 				for text in texts:
-					run_instance = LibraryRun(text, library)
+					run_instance = LibraryRun(text, library, negation_library)
 					self.append_to_output_file(run_instance, out)
 					#verbose_output(run_instance)
-
-	def get_library_from_file(self, library_filepath):
-		"""Load library from filepath
-
-		output = dictionary of library phrases to tuple of 
-		(phrase score, rule index)"""
-		with open(library_filepath, "r") as lib_file:
-			library = {}
-			for index, line in enumerate(lib_file):
-				phrase, score = line.split('\t')
-				library[phrase] = (int(score), index)
-		return library
 
 	def stream_lines(self, full_text):
 		"""Stream lines from text file. This is a generator."""
@@ -106,20 +123,36 @@ class LibraryRun(object):
 
 		word_freq = get_word_freq(self.text[1]) # {word: count}
 
-		tokens_list = tokenize(self.text[1]) # [[1-word tokens], [2-word tokens],...]
+		tokens_generator = tokenize(self.text[1]) # [(token, token_pos)]
 		
-		return (word_pos, word_freq, tokens_list)
+		return word_pos, word_freq, tokens_generator
 
-	def get_results(self):
+	def find_phrase_matches(self, tokens_generator):
+		"""Finds phrase matches between negation library and text, and 
+		normal library and text, and returns matches"""
 		# lib = {phrase: (score, rule_num)}
 
-		_, word_freq, tokens_list = self.do_preprocessing()
-		
+		#_, word_freq, tokens_generator = self.do_preprocessing()
 
-		matches_list = []
-		for phrase in library:
-			for (token, token_pos) in tokens_list:	
-				matches_list.append((re.search('^(' + phrase + ')$', token).string, token_pos))
+		matches = collections.defaultdict(list)
+		for phrase, (score, rule_num) in self.library.iteritems():
+			for token, token_pos in tokens_generator:
+				neg_phrase_search = re.search(
+					'^(' + get_opposite_meaning(phrase) + ')$', token)
+				if neg_phrase_search is not None:
+					matches[token].append(
+						(token_pos, -score, rule_num))
+				else:
+					phrase_search = re.search('^(' + phrase + ')$', token)
+					if phrase_search is not None:
+						matches[token].append(
+							(token_pos, score, rule_num))
+
+		return matches
+
+
+
+
 
 
 

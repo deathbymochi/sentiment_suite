@@ -40,6 +40,37 @@ class TestCleanRowFunction(unittest.TestCase):
 	# 		'100\t1 apple three apple 123 apples')
 	# 	self.assertEqual(obj_ut[1], ' apple three apple  apples')
 
+class TestLibraryHelperFunctions(unittest.TestCase):
+	"""Tests that library-making helper functions work correctly"""
+	@mock.patch('__builtin__.open', fake_open_library)
+	def test_get_library_from_file(self):
+		"""Tests that library is loaded correctly"""
+		obj_ut = sentiment.get_library_from_file("")
+		self.assertEqual(obj_ut, {'good':(1,0), 'bad':(-1,1)})
+
+	def test_create_negation_lib(self):
+		"""Tests that negation library is created correctly"""
+		obj_ut = sentiment.create_negation_lib(
+			{'good': (1, 0), 'bad': (-1, 1)})
+		self.assertEqual(obj_ut, 
+			{'(not|dont|cant|wont|couldnt|shouldnt|never) \w{0,2} good': (-1, 0),
+			'(not|dont|cant|wont|couldnt|shouldnt|never) \w{0,2} bad': (1, 1)})
+
+	def test_get_opposite_meaning_add(self):
+		"""Tests that get_opposite_meaning function correctly adds negation
+		words to given phrase"""
+		obj_ut = sentiment.get_opposite_meaning(
+			"good")
+		self.assertEqual(obj_ut, 
+			"(not|dont|cant|wont|couldnt|shouldnt|never) \w{0,2} good")
+
+	def test_get_opposite_meaning_subtract(self):
+		"""Tests that get_opposite_meaning function correctly takes away
+		negation words from given phrase"""
+		obj_ut = sentiment.get_opposite_meaning(
+			"(not|dont|cant|wont|couldnt|shouldnt|never) \w{0,2} good")
+		self.assertEqual(obj_ut, "good")
+
 
 class TestGetWordFreqFunction(unittest.TestCase):
 	"""Tests get_word_freq function returns word frequency properly"""
@@ -61,6 +92,7 @@ class TestTokenizeFunction(unittest.TestCase):
 			('brown cat', 1), 
 			('cat chases', 2), 
 			('chases mice', 3)])
+
 	def test_tokenize_no_min_no_max(self):
 		"""Tests tokenize function creates 1-word tokens when
 		no min_words or max_words args are provided"""
@@ -68,6 +100,7 @@ class TestTokenizeFunction(unittest.TestCase):
 			['a', 'brown', 'cat', 'chases', 'mice']))
 		self.assertEqual(obj_ut, 
 			[('a', 0), ('brown', 1), ('cat', 2), ('chases', 3), ('mice', 4)])
+
 	def test_tokenize_max_words(self):
 		"""Tests tokenize function creates tokens up to max_words long"""
 		obj_ut = list(sentiment.tokenize(
@@ -77,6 +110,7 @@ class TestTokenizeFunction(unittest.TestCase):
 			('a brown', 0), ('brown cat', 1), ('cat chases', 2), ('chases mice', 3),
 			('a brown cat', 0), ('brown cat chases', 1), ('cat chases mice', 2),
 			('a brown cat chases', 0), ('brown cat chases mice', 1)])
+
 	def test_tokenize_zero_value(self):
 		"""Tests tokenize function correctly defaults to 1-word tokens if
 		zero values given for min_words or max_words"""
@@ -94,13 +128,6 @@ class TestSentimentFactory(unittest.TestCase):
 		"""Tests we can instantiate SentimentFactory"""
 		obj_ut = sentiment.SentimentFactory("", "")
 		self.assertIsInstance(obj_ut, sentiment.SentimentFactory)
-
-	@mock.patch('__builtin__.open', fake_open_library)
-	def test_get_library_from_file(self):
-		"""Tests that library is loaded correctly"""
-		test = sentiment.SentimentFactory("", "")
-		obj_ut = test.get_library_from_file("")
-		self.assertEqual(obj_ut, {'good':(1,0), 'bad':(-1,1)})
 
 	@mock.patch('sentiment.clean_row', fake_clean_row)
 	def test_stream_lines(self):
@@ -126,10 +153,28 @@ class TestSentimentFactory(unittest.TestCase):
 
 class TestLibraryRun(unittest.TestCase):
 	"""Tests for the LibraryRun class"""
+	def setUp(self):
+		"""Define commonly used test things"""
+		self.text = '100\ttoday was not a good day. it was pretty bad.'
+		self.lib = {'good': (1, 0), 'bad': (-1, 1)}
+		self.tokens_generator = [
+		('today', 0), ('was', 1), ('not', 2), ('good', 3), ('today was', 0),
+		('was not', 1), ('not good', 2)]
+		## TO DO: FIX THE NEGATION MATCHES HITTING
+
 	def test_instantiate_library_run(self):
-		obj_ut = sentiment.LibraryRun("", "")
+		"""Tests that LibraryRun class instantiates"""
+		obj_ut = sentiment.LibraryRun("", "", "")
 		self.assertIsInstance(obj_ut, sentiment.LibraryRun)
 
+	def test_find_phrase_matches(self):
+		"""Tests find_phrase_matches finds correct matches in text using
+		negation library and normal library"""
+		test = sentiment.LibraryRun(self.text, self.lib)
+		obj_ut = test.find_phrase_matches(self.tokens_generator)
+		print obj_ut
+		self.assertEqual(dict(obj_ut),
+			{'not good': (2, -1, 0)})
 
 if __name__ == '__main__':
 	unittest.main()
