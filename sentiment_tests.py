@@ -53,8 +53,8 @@ class TestLibraryHelperFunctions(unittest.TestCase):
 		obj_ut = sentiment.create_negation_lib(
 			{'good': (1, 0), 'bad': (-1, 1)})
 		self.assertEqual(obj_ut, 
-			{'(not|dont|cant|wont|couldnt|shouldnt|never) \w{0,2} good': (-1, 0),
-			'(not|dont|cant|wont|couldnt|shouldnt|never) \w{0,2} bad': (1, 1)})
+			{'(not|dont|cant|wont|couldnt|shouldnt|never) (\w+ ){0,2} ?good': (-1, 0),
+			'(not|dont|cant|wont|couldnt|shouldnt|never) (\w+ ){0,2} ?bad': (1, 1)})
 
 	def test_get_opposite_meaning_add(self):
 		"""Tests that get_opposite_meaning function correctly adds negation
@@ -62,13 +62,13 @@ class TestLibraryHelperFunctions(unittest.TestCase):
 		obj_ut = sentiment.get_opposite_meaning(
 			"good")
 		self.assertEqual(obj_ut, 
-			"(not|dont|cant|wont|couldnt|shouldnt|never) \w{0,2} good")
+			"(not|dont|cant|wont|couldnt|shouldnt|never) (\w+ ){0,2} ?good")
 
 	def test_get_opposite_meaning_subtract(self):
 		"""Tests that get_opposite_meaning function correctly takes away
 		negation words from given phrase"""
 		obj_ut = sentiment.get_opposite_meaning(
-			"(not|dont|cant|wont|couldnt|shouldnt|never) \w{0,2} good")
+			"(not|dont|cant|wont|couldnt|shouldnt|never) (\w+ ){0,2} ?good")
 		self.assertEqual(obj_ut, "good")
 
 
@@ -155,26 +155,46 @@ class TestLibraryRun(unittest.TestCase):
 	"""Tests for the LibraryRun class"""
 	def setUp(self):
 		"""Define commonly used test things"""
-		self.text = '100\ttoday was not a good day. it was pretty bad.'
+		self.text1 = '100\ttoday was not good'
+		self.text2 = '100\ttoday was not good not good at all'
+		self.text3 = '100\ttoday was not good not very good'
 		self.lib = {'good': (1, 0), 'bad': (-1, 1)}
-		self.tokens_generator = [
+		self.tokens_generator1 = [
 		('today', 0), ('was', 1), ('not', 2), ('good', 3), ('today was', 0),
 		('was not', 1), ('not good', 2)]
-		## TO DO: FIX THE NEGATION MATCHES HITTING
+		self.tokens_generator2 = list(sentiment.tokenize(self.text2.split()[1:], max_words=2))
+		self.tokens_generator3 = list(sentiment.tokenize(self.text3.split()[1:], max_words=3))
 
 	def test_instantiate_library_run(self):
 		"""Tests that LibraryRun class instantiates"""
-		obj_ut = sentiment.LibraryRun("", "", "")
+		obj_ut = sentiment.LibraryRun("", "")
 		self.assertIsInstance(obj_ut, sentiment.LibraryRun)
 
-	def test_find_phrase_matches(self):
+	def test_find_phrase_matches1(self):
 		"""Tests find_phrase_matches finds correct matches in text using
 		negation library and normal library"""
-		test = sentiment.LibraryRun(self.text, self.lib)
-		obj_ut = test.find_phrase_matches(self.tokens_generator)
-		print obj_ut
+		test = sentiment.LibraryRun(self.text1, self.lib)
+		obj_ut = test.find_phrase_matches(self.tokens_generator1)
 		self.assertEqual(dict(obj_ut),
-			{'not good': (2, -1, 0)})
+			{'not good': [(2, -1, 0)]})
+
+	def test_find_phrase_matches2(self):
+		"""Tests find_phrase_matches finds multiple matches of same 
+		phrase correctly"""
+		test = sentiment.LibraryRun(self.text2, self.lib)
+		obj_ut = test.find_phrase_matches(self.tokens_generator2)
+		self.assertEqual(dict(obj_ut),
+			{'not good': [(2, -1, 0), (4, -1, 0)]})
+
+	def test_find_phrase_matches3(self):
+		"""Tests find_phrase_matches finds negation phrases correctly"""
+		test = sentiment.LibraryRun(self.text3, self.lib)
+		obj_ut = test.find_phrase_matches(self.tokens_generator3)
+		self.assertEqual(dict(obj_ut),
+			{'not good': [(2, -1, 0)], 'not very good': [(4, -1, 0)]})
+
+	def test_score_text(self):
+		pass
 
 if __name__ == '__main__':
 	unittest.main()

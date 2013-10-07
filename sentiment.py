@@ -60,7 +60,7 @@ def get_library_from_file(library_filepath):
 
 def get_opposite_meaning(phrase):
 	"""Adds/removes negation words to/from phrase to get opposite meaning"""
-	negation_words = '(not|dont|cant|wont|couldnt|shouldnt|never) \w{0,2} ?'
+	negation_words = '(not|dont|cant|wont|couldnt|shouldnt|never) (\w+ ){0,2} ?'
 	if negation_words in phrase:
 		phrase = phrase.replace(negation_words, "")
 	else:
@@ -125,7 +125,7 @@ class LibraryRun(object):
 
 		tokens_generator = tokenize(self.text[1]) # [(token, token_pos)]
 		
-		return word_pos, word_freq, tokens_generator
+		return word_freq, tokens_generator
 
 	def find_phrase_matches(self, tokens_generator):
 		"""Finds phrase matches between negation library and text, and 
@@ -136,13 +136,16 @@ class LibraryRun(object):
 
 		matches = collections.defaultdict(list)
 		for phrase, (score, rule_num) in self.library.iteritems():
+			found_neg_phrase = False
 			for token, token_pos in tokens_generator:
 				neg_phrase_search = re.search(
 					'^(' + get_opposite_meaning(phrase) + ')$', token)
 				if neg_phrase_search is not None:
+					found_neg_phrase = True
 					matches[token].append(
 						(token_pos, -score, rule_num))
-				else:
+			if found_neg_phrase == False:
+				for token, token_pos in tokens_generator:
 					phrase_search = re.search('^(' + phrase + ')$', token)
 					if phrase_search is not None:
 						matches[token].append(
@@ -150,8 +153,14 @@ class LibraryRun(object):
 
 		return matches
 
+	def score_text(self, matches, end_weight=1.5, end_threshold=0.75):
+		"""Scores text by averaging phrase-match scores. Optionally, 
+		phrases at the end of the text are weighted higher (by default)"""
 
+		for token in matches:
+			for token_pos, score, _ in matches[token]:
 
+		
 
 
 
