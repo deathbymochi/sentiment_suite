@@ -155,20 +155,35 @@ class TestLibraryRun(unittest.TestCase):
 	"""Tests for the LibraryRun class"""
 	def setUp(self):
 		"""Define commonly used test things"""
-		self.text1 = '100\ttoday was not good'
-		self.text2 = '100\ttoday was not good not good at all'
-		self.text3 = '100\ttoday was not good not very good'
+		self.text1 = ('100', 'today was not good')
+		self.text2 = ('100', 'today was not good not good at all')
+		self.text3 = ('100', 'today was not good not very good')
 		self.lib = {'good': (1, 0), 'bad': (-1, 1)}
 		self.tokens_generator1 = [
 		('today', 0), ('was', 1), ('not', 2), ('good', 3), ('today was', 0),
 		('was not', 1), ('not good', 2)]
-		self.tokens_generator2 = list(sentiment.tokenize(self.text2.split()[1:], max_words=2))
-		self.tokens_generator3 = list(sentiment.tokenize(self.text3.split()[1:], max_words=3))
+		self.tokens_generator2 = list(sentiment.tokenize(self.text2[1].split(), max_words=2))
+		self.tokens_generator3 = list(sentiment.tokenize(self.text3[1].split(), max_words=3))
 
-	def test_instantiate_library_run(self):
+	def test_instantiate_library_run1(self):
 		"""Tests that LibraryRun class instantiates"""
-		obj_ut = sentiment.LibraryRun("", "")
+		obj_ut = sentiment.LibraryRun(self.text1, self.lib)
 		self.assertIsInstance(obj_ut, sentiment.LibraryRun)
+
+	def test_instantiate_library_run2(self):
+		"""Tests that LibraryRun class correctly creates word count"""
+		obj_ut = sentiment.LibraryRun(self.text1, self.lib)
+		self.assertEqual(obj_ut.wordcount, 4)
+
+	def test_instantiate_library_run2(self):
+		"""Tests that LibraryRun class correctly creates word count"""
+		obj_ut = sentiment.LibraryRun(self.text2, self.lib)
+		self.assertEqual(obj_ut.wordcount, 8)
+
+	def test_instantiate_library_run2(self):
+		"""Tests that LibraryRun class correctly creates word count"""
+		obj_ut = sentiment.LibraryRun(self.text3, self.lib)
+		self.assertEqual(obj_ut.wordcount, 7)
 
 	def test_find_phrase_matches1(self):
 		"""Tests find_phrase_matches finds correct matches in text using
@@ -193,9 +208,20 @@ class TestLibraryRun(unittest.TestCase):
 		self.assertEqual(dict(obj_ut),
 			{'not good': [(2, -1, 0)], 'not very good': [(4, -1, 0)]})
 
-	def test_score_text(self):
-		pass
+	def test_score_text1(self):
+		"""Tests score_text scores text correctly"""
+		test = sentiment.LibraryRun(self.text3, self.lib)
+		matches = test.find_phrase_matches(self.tokens_generator3)
+		obj_ut = test.score_text(matches)
+		self.assertEqual(obj_ut, -1)
+
+	def test_score_text2(self):
+		"""Tests score_text weights phrases correctly"""
+		#import pdb; pdb.set_trace()
+		test = sentiment.LibraryRun(self.text3, self.lib)
+		matches = test.find_phrase_matches(self.tokens_generator3)
+		obj_ut = test.score_text(matches, end_threshold=0.5)
+		self.assertEqual(obj_ut, -1.25)
 
 if __name__ == '__main__':
 	unittest.main()
-

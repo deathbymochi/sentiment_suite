@@ -19,7 +19,7 @@ def clean_row(row):
 	return (text_id, text)
 
 def get_word_freq(text):
-	"""Gets word freq for each word in a text string"""
+	"""Gets word freq for each word in a text string, outputs {word: count}"""
 	split_text = text.split()
 	word_freq = collections.defaultdict(int)
 	for word in split_text:
@@ -33,6 +33,9 @@ def tokenize(text, min_words=1, max_words=None):
 	text = list of single words in order of the text
 	min_words = min number of words to make token out of
 	max_words = max number of words to make token out of
+
+	output: generator objects of tokens, one for each token length
+	desired
 	"""
 	if max_words == None:
 		max_words = min_words
@@ -49,8 +52,12 @@ def tokenize(text, min_words=1, max_words=None):
 
 def get_library_from_file(library_filepath):
 	"""Load library from filepath
+
+	input = filepath of library file, where col 1 = phrase, 
+	col 2 = score
+
 	output = dictionary of library phrases to tuple of 
-	(phrase score, rule index)"""
+	(phrase score, rule index) for each phrase """
 	with open(library_filepath, "r") as lib_file:
 		library = {}
 		for index, line in enumerate(lib_file):
@@ -86,7 +93,13 @@ class SentimentFactory(object):
 		self.output_filename = output_filename
 
 	def run_suite(self):
-		"""Starts library runs for each essay"""
+		"""Starts library runs for each essay
+
+		Loads library files and texts, then iteratively appends to output file
+		a line containing results of running library on each text. Texts are 
+		streamed into Python and written to the output file one at a time
+
+		"""
 		library = get_library_from_file(self.library_filepath)
 		negation_library = create_negation_lib(library)
 		with open(self.output_directory+self.output_filename, "a") as out:
@@ -94,7 +107,10 @@ class SentimentFactory(object):
 				texts = self.stream_lines(full_text)
 				for text in texts:
 					run_instance = LibraryRun(text, library, negation_library)
-					self.append_to_output_file(run_instance, out)
+					run_instance.do_run()
+					results = run_instance.get_results()
+					for line in results:
+						self.append_to_output_file(line, out)
 					#verbose_output(run_instance)
 
 	def stream_lines(self, full_text):
@@ -102,21 +118,31 @@ class SentimentFactory(object):
 		for line in full_text:
 			yield clean_row(line)
 
-	def append_to_output_file(self, run_instance, output_file):
+	def append_to_output_file(self, line, output_file):
 		"""Appends single line to an output file"""
-		output_file.write(run_instance.results)
+		output_file.write(line)
 
 
 class LibraryRun(object):
-	"""Class that runs given library on given text string"""
-	def __init__(self, text, library):
+	"""Class that runs given library on given text
+
+	text = (text_id, [single words in order of text])
+	library = {library phrase: (phrase score, rule number)
+
+	initializes with do_preprocessing()}
+	"""
+	def __init__(self, text, library, end_weight=1.5, end_threshold=0.75):
 		self.text = text
 		self.library = library
+		self.word_freq, self.tokens_generator = self.do_preprocessing()
+		self.end_weight = end_weight
+		self.end_threshold = end_threshold
 
 	def do_preprocessing(self):
-		"""Preprocesses text to create needed data like tokens, 
-		word count, word frequencies for returning results"""
+		"""Preprocesses text to create needed data: text id, word count,
+		and tokens generator for returning results"""
 		self.text_id = self.text[0]
+
 		# get word position of each word in text
 		word_pos = self.text[1].split() # [word1, word2,...]
 		self.wordcount = len(word_pos) # total word count
@@ -129,10 +155,13 @@ class LibraryRun(object):
 
 	def find_phrase_matches(self, tokens_generator):
 		"""Finds phrase matches between negation library and text, and 
-		normal library and text, and returns matches"""
-		# lib = {phrase: (score, rule_num)}
+		normal library and text, and returns matches
 
-		#_, word_freq, tokens_generator = self.do_preprocessing()
+		tokens_generator = generator listing (token, token_pos) for text
+
+		output = dict of phrase to list of tuples for each phrase hit 
+		(token position, phrase score, rule number) """
+		# lib = {phrase: (score, rule_num)}
 
 		matches = collections.defaultdict(list)
 		for phrase, (score, rule_num) in self.library.iteritems():
@@ -155,18 +184,46 @@ class LibraryRun(object):
 
 	def score_text(self, matches, end_weight=1.5, end_threshold=0.75):
 		"""Scores text by averaging phrase-match scores. Optionally, 
-		phrases at the end of the text are weighted higher (by default)"""
+		phrases at the end of the text are weighted (by default,
+		phrases in last 25% weighted 1.5x)
+	    
+	    matches = {phrase: list of tuples for each phrase hit 
+	    (token pos, phrase score, rule num)}
 
+	    output = score for entire text
+		"""
+		# weight phrases at end of text
+		all_scores = []
 		for token in matches:
-			for token_pos, score, _ in matches[token]:
+			for hit in matches[token]:
+				if float(hit[0]) / float(self.wordcount) >= end_threshold:
+					all_scores.append(hit[1] * end_weight)
+				else:
+					all_scores.append(hit[1])
 
-		
+		# calc score for whole text
+		text_score = sum(all_scores) / len(all_scores)
 
+		return text_score
 
+	def do_run(self):
+		"""Runs find_phrase_matches() and text_score() to create data
+		that will be used by get_results() in creating results output"""
+		self.matches = self.find_phrase_matches(self.tokens_generator)
+		self.text_score = self.score_text(self.matches, 
+			self.end_weight, self.end_threshold)
 
+	def get_results(self):
+		"""Creates results output from data gotten from running
+		library on the text
 
+		Each item in results list = data for one line
+		"""
+		results = []
+		for token in self.matches:
+			for hit in matches[token]:
+				pass
 
-
-
-
-
+	def format_results(self):
+		"""Formats results into text strings geared for writing to file"""
+		pass
