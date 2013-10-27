@@ -179,7 +179,7 @@ class TestLibraryRun(unittest.TestCase):
 		"""Tests that LibraryRun class correctly creates word count"""
 		obj_ut = sentiment.LibraryRun(self.text2, self.lib)
 		self.assertEqual(obj_ut.wordcount, 8)
-
+     
 	def test_instantiate_library_run2(self):
 		"""Tests that LibraryRun class correctly creates word count"""
 		obj_ut = sentiment.LibraryRun(self.text3, self.lib)
