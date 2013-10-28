@@ -71,6 +71,8 @@ class TestLibraryHelperFunctions(unittest.TestCase):
 			"(not|dont|cant|wont|couldnt|shouldnt|never) (\w+ ){0,2} ?good")
 		self.assertEqual(obj_ut, "good")
 
+	def test_find_max_wordlength(self):
+		pass
 
 class TestGetWordFreqFunction(unittest.TestCase):
 	"""Tests get_word_freq function returns word frequency properly"""
@@ -137,18 +139,19 @@ class TestSentimentFactory(unittest.TestCase):
 		obj_ut = [line for line in test.stream_lines(test_fo)]
 		self.assertEqual(obj_ut, ['this is line 1\n', 'this is line 2\n'])
 
-	def test_append_to_output_file(self):
-		"""Tests that append_to_output_file appends line to output file.
-		This maybe doesn't test appending as you would expect, but we couldn't
-		figure out how to do it using a StringIO object and this is probably
-		cleaner than mocking everything"""
-		test = sentiment.SentimentFactory("", "")
-		run_instance = mock.Mock()
-		run_instance.results = "this is a line to append\n"
-		output_file = StringIO.StringIO()
-		target = "this is a line to append\n"
-		test.append_to_output_file(run_instance, output_file)
-		self.assertEqual(output_file.getvalue(), target)
+	# def test_append_to_output_file(self):
+	# 	"""Tests that append_to_output_file appends line to output file.
+	# 	This maybe doesn't test appending as you would expect, but we couldn't
+	# 	figure out how to do it using a StringIO object and this is probably
+	# 	cleaner than mocking everything"""
+	# 	test = sentiment.SentimentFactory("", "")
+	# 	run_instance = mock.Mock()
+	# 	run_instance.results = "this is a line to append\n"
+	# 	output_file = StringIO.StringIO()
+	# 	target = "this is a line to append\n"
+	# 	test.append_to_output_file(run_instance, output_file)
+	# 	import pdb; pdb.set_trace()
+	# 	self.assertEqual(output_file.getvalue(), target)
 
 
 class TestLibraryRun(unittest.TestCase):
@@ -189,39 +192,88 @@ class TestLibraryRun(unittest.TestCase):
 		"""Tests find_phrase_matches finds correct matches in text using
 		negation library and normal library"""
 		test = sentiment.LibraryRun(self.text1, self.lib)
-		obj_ut = test.find_phrase_matches(self.tokens_generator1)
+		obj_ut = test.find_phrase_matches(self.tokens_generator1)[0]
 		self.assertEqual(dict(obj_ut),
-			{'not good': [(2, -1, 0)]})
+			{'not good': [[2, -1, 0]]})
 
 	def test_find_phrase_matches2(self):
 		"""Tests find_phrase_matches finds multiple matches of same 
 		phrase correctly"""
 		test = sentiment.LibraryRun(self.text2, self.lib)
-		obj_ut = test.find_phrase_matches(self.tokens_generator2)
+		obj_ut = test.find_phrase_matches(self.tokens_generator2)[0]
 		self.assertEqual(dict(obj_ut),
-			{'not good': [(2, -1, 0), (4, -1, 0)]})
+			{'not good': [[2, -1, 0], [4, -1, 0]]})
 
 	def test_find_phrase_matches3(self):
 		"""Tests find_phrase_matches finds negation phrases correctly"""
 		test = sentiment.LibraryRun(self.text3, self.lib)
-		obj_ut = test.find_phrase_matches(self.tokens_generator3)
+		obj_ut = test.find_phrase_matches(self.tokens_generator3)[0]
 		self.assertEqual(dict(obj_ut),
-			{'not good': [(2, -1, 0)], 'not very good': [(4, -1, 0)]})
+			{'not good': [[2, -1, 0]], 'not very good': [[4, -1, 0]]})
 
 	def test_score_text1(self):
 		"""Tests score_text scores text correctly"""
 		test = sentiment.LibraryRun(self.text3, self.lib)
-		matches = test.find_phrase_matches(self.tokens_generator3)
-		obj_ut = test.score_text(matches)
+		matches = test.find_phrase_matches(self.tokens_generator3)[0]
+		obj_ut, _ = test.score_text(matches)
 		self.assertEqual(obj_ut, -1)
 
 	def test_score_text2(self):
 		"""Tests score_text weights phrases correctly"""
 		#import pdb; pdb.set_trace()
 		test = sentiment.LibraryRun(self.text3, self.lib)
-		matches = test.find_phrase_matches(self.tokens_generator3)
-		obj_ut = test.score_text(matches, end_threshold=0.5)
+		matches = test.find_phrase_matches(self.tokens_generator3)[0]
+		obj_ut, _ = test.score_text(matches, end_threshold=0.5)
 		self.assertEqual(obj_ut, -1.25)
+
+	def test_score_text3(self):
+		"""Tests that score_text creates matches_weighted correctly
+		when no weights are applied"""
+		test = sentiment.LibraryRun(self.text3, self.lib)
+		matches = test.find_phrase_matches(self.tokens_generator3)[0]
+		_, obj_ut = test.score_text(matches)
+		self.assertEqual(obj_ut, {'not good': [[2, -1, 0]],
+			'not very good': [[4, -1, 0]]})
+
+	def test_score_text4(self):
+		"""Tests that score_text creates matches_weighted correctly
+		when weights are applied"""
+		test = sentiment.LibraryRun(self.text3, self.lib)
+		matches = test.find_phrase_matches(self.tokens_generator3)[0]
+		_, obj_ut = test.score_text(matches, end_threshold=0.5)
+		self.assertEqual(obj_ut, {'not good': [[2, -1, 0]], 
+			'not very good': [[4, -1.5, 0]]})
+
+	def test_make_results_verbose1(self):
+		"""Tests that make_results_verbose() correctly creates results"""
+		test = sentiment.LibraryRun(self.text3, self.lib)
+		test.do_run()
+		test.make_results_verbose()
+		obj_ut = test.results_verbose
+		self.assertEqual(obj_ut, [['100', 'not good', 2, -1, 0],
+			['100', 'not very good', 4, -1, 0]])
+
+	def test_make_results_simple(self):
+		"""Tests that make_results_simple() correctly creates results"""
+		test = sentiment.LibraryRun(self.text3, self.lib)
+		test.do_run()
+		test.make_results_simple()
+		obj_ut = test.results_simple
+		self.assertEqual(obj_ut, {'.text id': '100', '.text score': -1, 
+			'total wordcount': 7, 'total hits': 2, 'pos hits': 0,
+			'neg hits': 2})
+
+	def test_get_results_simple(self):
+		"""Tests that get_results() makes simple results correctly"""
+		test = sentiment.LibraryRun(self.text3, self.lib)
+		test.do_run()
+		obj_ut = test.get_results()
+		self.assertEqual(obj_ut, ['.text id\t.text score\tneg hits\t\
+pos hits\ttotal hits\ttotal wordcount\n', '100\t-1\t2\t0\t2\t7\n'])
+
+	def test_get_results_verbose(self):
+		"""Tests that get_results() makes verbose results correctly"""
+		pass
 
 if __name__ == '__main__':
 	unittest.main()

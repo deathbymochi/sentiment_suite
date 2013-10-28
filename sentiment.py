@@ -8,7 +8,6 @@ import string
 class SentimentException(Exception):
 	pass
 
-
 def clean_row(row):
 	"""Cleans row from text file, outputs tuple (ID, cleaned_text)"""
 	text_id, text = row.split('\t')
@@ -65,9 +64,11 @@ def get_library_from_file(library_filepath):
 			library[phrase] = (int(score), index)
 	return library
 
-def get_opposite_meaning(phrase):
+def get_opposite_meaning(phrase, num_words_btwn=2):
 	"""Adds/removes negation words to/from phrase to get opposite meaning"""
-	negation_words = '(not|dont|cant|wont|couldnt|shouldnt|never) (\w+ ){0,2} ?'
+	negation_words = (
+		'(not|dont|cant|wont|couldnt|shouldnt|never) (\w+ ){0,' + str(
+			num_words_btwn) + '} ?')
 	if negation_words in phrase:
 		phrase = phrase.replace(negation_words, "")
 	else:
@@ -81,6 +82,32 @@ def create_negation_lib(library):
 	for phrase, (score, rule_num) in library.iteritems():
 		negation_lib[get_opposite_meaning(phrase)] = (-score, rule_num)
 	return negation_lib
+
+def find_max_wordlength(phrase_list):
+	"""Finds the max number of words a phrase consists of, 
+	in a given list of phrases"""
+	max_words = 0
+
+	for phrase in phrase_list:
+		if len(phrase.split()) > max_words:
+			max_words = len(phrase.split())
+		
+	return max_words
+
+def format_lines_list(lines_list):
+	"""Formats list into text strings geared for writing to file
+
+	requires list of lists as input, where each embedded list 
+	represents the data to be written to a single line of the
+	output file
+	"""
+	formatted = []
+	for line in lines_list:
+		joined_line = '\t'.join(str(el) for el in line)
+		joined_line = joined_line + '\n'
+		formatted.append(joined_line)
+
+	return formatted
 
 
 class SentimentFactory(object):
@@ -111,7 +138,6 @@ class SentimentFactory(object):
 					results = run_instance.get_results()
 					for line in results:
 						self.append_to_output_file(line, out)
-					#verbose_output(run_instance)
 
 	def stream_lines(self, full_text):
 		"""Stream lines from text file. This is a generator."""
@@ -149,7 +175,12 @@ class LibraryRun(object):
 
 		word_freq = get_word_freq(self.text[1]) # {word: count}
 
-		tokens_generator = tokenize(self.text[1]) # [(token, token_pos)]
+		library_phrases = [line[0] for line in self.library]
+		max_words = (
+		find_max_wordlength(library_phrases) + 2) # for word allowances from negation
+
+		tokens_generator = list(
+		tokenize(word_pos, max_words=max_words)) # [(token, token_pos)]
 		
 		return word_freq, tokens_generator
 
@@ -163,6 +194,9 @@ class LibraryRun(object):
 		(token position, phrase score, rule number) """
 		# lib = {phrase: (score, rule_num)}
 
+		hitcount_pos = 0
+		hitcount_neg = 0
+
 		matches = collections.defaultdict(list)
 		for phrase, (score, rule_num) in self.library.iteritems():
 			found_neg_phrase = False
@@ -172,15 +206,17 @@ class LibraryRun(object):
 				if neg_phrase_search is not None:
 					found_neg_phrase = True
 					matches[token].append(
-						(token_pos, -score, rule_num))
+						[token_pos, -score, rule_num])
+					hitcount_neg += 1
 			if found_neg_phrase == False:
 				for token, token_pos in tokens_generator:
 					phrase_search = re.search('^(' + phrase + ')$', token)
 					if phrase_search is not None:
 						matches[token].append(
-							(token_pos, score, rule_num))
+							[token_pos, score, rule_num])
+						hitcount_pos += 1
 
-		return matches
+		return matches, hitcount_pos, hitcount_neg
 
 	def score_text(self, matches, end_weight=1.5, end_threshold=0.75):
 		"""Scores text by averaging phrase-match scores. Optionally, 
@@ -192,38 +228,111 @@ class LibraryRun(object):
 
 	    output = score for entire text
 		"""
-		# weight phrases at end of text
+		# create matches dict where we will
+		# add weighted scores instead of unweighted scores
+		matches_weighted = matches.copy()
+
+		# weight phrases at end of text, put all scores into all_scores
+		# to easily sum over for score of whole text, and
+		# add weighted score to matches_weighted
 		all_scores = []
-		for token in matches:
-			for hit in matches[token]:
+		for token in matches_weighted:
+			for hit in matches_weighted[token]:
 				if float(hit[0]) / float(self.wordcount) >= end_threshold:
 					all_scores.append(hit[1] * end_weight)
+					hit[1] = hit[1] * end_weight
 				else:
 					all_scores.append(hit[1])
 
-		# calc score for whole text
+		# calc score for whole text, using weighted scores
 		text_score = sum(all_scores) / len(all_scores)
 
-		return text_score
+		return text_score, matches_weighted
 
 	def do_run(self):
 		"""Runs find_phrase_matches() and text_score() to create data
-		that will be used by get_results() in creating results output"""
-		self.matches = self.find_phrase_matches(self.tokens_generator)
-		self.text_score = self.score_text(self.matches, 
-			self.end_weight, self.end_threshold)
+		that will be used by get_results() in creating results output
 
-	def get_results(self):
+		Creates: matches_unweighted, which is data for each phrase hit
+		using unweighted scores; matches_weighted, which is data for 
+		each phrase hit using weighted scores; test_score, which is the
+		text's overall score
+		"""
+		self.matches_unweighted, hitcount_pos, hitcount_neg = (
+		self.find_phrase_matches(self.tokens_generator))
+
+		self.hitcount = {'pos': hitcount_pos, 'neg': hitcount_neg, 
+		'total': hitcount_pos + hitcount_neg}
+
+		self.text_score, self.matches_weighted = self.score_text(self.matches_unweighted, 
+			self.end_weight, self.end_threshold)		 
+
+	def make_results_verbose(self):
 		"""Creates results output from data gotten from running
 		library on the text
 
 		Each item in results list = data for one line
 		"""
+		# add each phrase hit's data to a separate element of results list
 		results = []
-		for token in self.matches:
-			for hit in matches[token]:
-				pass
+		for token in self.matches_weighted:
+			for hit in self.matches_weighted[token]:
+				results.append([self.text_id, token, hit[0], hit[1], hit[2]])
 
-	def format_results(self):
-		"""Formats results into text strings geared for writing to file"""
-		pass
+		self.results_verbose = sorted(results)
+
+	def make_results_simple(self):
+		"""Creates simple summary results for whole text"""
+		results = {'.text id': self.text_id, '.text score': self.text_score, 
+		'total wordcount': self.wordcount, 
+		'total hits': self.hitcount['total'],
+		'pos hits': self.hitcount['pos'], 'neg hits': self.hitcount['neg']}
+
+		self.results_simple = results
+
+	def get_results(self, simple=True):
+		"""Gets results from LibraryRun for writing to file.
+		If simple=True, then just returns a single line 
+		showing summary stats for whole text: text_score, 
+		word count, number of hits (total, pos, neg)
+
+		If simple=False, then verbose output which is data for each
+		individual phrase hit (phrase, word pos, weighted 
+		phrase score, rule number) is returned
+
+	    get_results() uses format_results() to put results in 
+	    the write format for writing to file
+		"""
+		#import pdb; pdb.set_trace()
+		if simple is True:
+			self.make_results_simple()
+
+			# get simple results into list of lists format, where
+			# each embedded list represents one line of output - this
+			# is so format_results() can format correctly
+			results = []
+			header = []
+
+			sorted_results = sorted(list(self.results_simple.iteritems()))
+			for item in sorted_results:
+				results.append(item[1])
+				header.append(item[0])
+			results = [results]
+			header = [header]
+		else:
+			self.make_results_verbose()
+			results = self.results_verbose
+			header = [['text id', 'phrase', 'word pos', 
+			'weighted score', 'rule num']]
+
+		results_formatted = format_lines_list(results)
+		header_formatted = format_lines_list(header)
+		
+		complete_formatted = list(header_formatted)
+		complete_formatted.extend(results_formatted)
+
+		return complete_formatted
+
+
+
+		
