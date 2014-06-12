@@ -1,0 +1,5 @@
+This module contains functions to aid in simple sentiment analysis of texts - provided 
+lists of positive and negative phrases, a body of texts could be scored for each 
+positive and negative hit, and assigned an overall 'sentiment' score.
+
+(Currently defunct)
